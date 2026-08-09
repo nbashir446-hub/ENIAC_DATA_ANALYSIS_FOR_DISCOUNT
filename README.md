@@ -47,12 +47,13 @@ The analytical pipeline evaluates four core relational data files:
 eniac-discount-analysis/
 │
 ├── data/
-│   ├── raw/               # Contains initial source CSV files (Ignored by Git if large)
-│   └── processed/         # Cleaned, ready-for-analysis CSVs
+│   ├── raw/               # Contains initial source CSV files
+│   └── processed/         # Cleaned, Quality Data ready-for-analysis CSVs
 │
 ├── notebooks/
-│   └── eniac_discount_analysis.ipynb   # Complete data cleaning & analysis notebook
-│
+│   └── ENIAC_DISCOUNT_Analysis_FILE_1.ipynb   # Complete data cleaning & analysis notebook
+│   └── ENIAC_DISCOUNT_Analysis_FILE_2.ipynb
+
 ├── deliverables/
 │   └── eniac_strategy_presentation.pdf # 5-minute executive presentation slides
 │
