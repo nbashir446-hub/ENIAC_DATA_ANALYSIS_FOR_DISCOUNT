@@ -1,0 +1,80 @@
+import pandas as pd
+# orders_cl.csv
+url = "https://drive.google.com/file/d/1clMQ_JgII9h6FX931gFN5bjqstwR2FNe/view?usp=drive_link"
+path = "https://drive.google.com/uc?export=download&id="+url.split("/")[-2]
+orders_df = pd.read_csv(path)
+
+# orderlines_cl.csv
+url = "https://drive.google.com/file/d/1L8q-smVIRmn_SpGgDfsVtDZ_7-wtda-j/view?usp=drive_link"
+path = "https://drive.google.com/uc?export=download&id="+url.split("/")[-2]
+orderlines_df = pd.read_csv(path)
+
+# products_cl.csv
+url = "https://drive.google.com/file/d/1EEwu-HCrbFSYNO7mloYIHUKf4JuO2cSG/view?usp=drive_link"
+path = "https://drive.google.com/uc?export=download&id="+url.split("/")[-2]
+products_df = pd.read_csv(path)
+
+## Quality exclusions:
+# exclude orders with items that don't appear in products
+orderlines_products = orderlines_df.merge(products_df, how="left", on = "sku")[["order_id","sku","name" ]]
+
+orders_to_delete = orderlines_products.loc[orderlines_products["name"].isna(), "order_id"].unique()
+
+orderlines_df = orderlines_df.loc[~orderlines_df["order_id"].isin(orders_to_delete)]
+
+# keep only completed orders
+orders_df = orders_df.loc[orders_df["state"] == "Completed"]
+
+# keep only orders that appear in both orderlines and orders
+
+# order_ids that are in both tables
+order_ids_to_keep = (
+    orders_df
+    .merge(orderlines_df, how="inner", on="order_id")
+    ["order_id"].unique()
+)
+
+# keep those ids in orders
+orders_df = orders_df.loc[orders_df["order_id"].isin(order_ids_to_keep)].copy()
+
+# keep those ids in orderlines
+orderlines_df = orderlines_df.loc[orderlines_df["order_id"].isin(order_ids_to_keep)].copy()
+
+# keep only orders with low disagreement between total prices as calculated from orderlines and total_paid from orders
+
+# find difference between two "total" values
+orderlines_order_ids = (
+    orderlines_df
+    .assign(unit_price_total=orderlines_df["product_quantity"]*orderlines_df["unit_price"])
+    .groupby("order_id", as_index=False)
+    ["unit_price_total"].sum()
+)
+diff_df = orders_df.merge(orderlines_order_ids, on="order_id")
+diff_df["difference"] = diff_df["total_paid"] - diff_df["unit_price_total"]
+
+# calculate the quartiles
+Q1 = diff_df["difference"].quantile(0.25)
+Q3 = diff_df["difference"].quantile(0.75)
+
+# calculate the interquartile range
+IQR = Q3-Q1
+
+# filter to include only "non-outliers" via 1.5*IQR rule
+low_mask = diff_df["difference"] >= (Q1 - 1.5*IQR)
+high_mask = diff_df["difference"] <= (Q3 + 1.5*IQR)
+normal_diff_ids = diff_df.loc[low_mask & high_mask, "order_id"].unique()
+
+orders_df = orders_df.loc[orders_df["order_id"].isin(normal_diff_ids)].copy()
+orderlines_df = orderlines_df.loc[orderlines_df["order_id"].isin(normal_diff_ids)].copy()
+
+# from google.colab import files
+
+# orders_df.to_csv("orders_df.csv", index=False)
+# files.download("orders_df.csv")
+
+# orderlines_df.to_csv("orderlines_df.csv", index=False)
+# files.download("orderlines_df.csv")
+
+# working locally
+orders_df.to_csv("../Data/Quality/orders_qu.csv", index=False)
+orderlines_df.to_csv("../Data/Quality/orderlines_qu.csv", index=False)
